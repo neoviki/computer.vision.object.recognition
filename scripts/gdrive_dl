@@ -1,0 +1,113 @@
+#   GOOGLE DRIVE FILE DOWNLOADER
+#
+#
+#   Author:
+#           Vignesh  ( vikiworks.io )
+
+
+log_s="[ SUCCESS .] "
+log_e="[ ERROR ...] "
+log_i="[ INFO ....] "
+log_n="[ STATUS ..] "
+
+file_id=$1
+file_name=$2
+temp_path=""
+cookie_name=""
+warning_page=""
+confirm_key=""
+base_url=""
+confirm_key_str=""
+
+argument_check(){
+    if [[ -z $file_id ]] || [[ -z $file_name ]]; then
+        echo
+        echo "  usage   : gdrive_dl  <file_id>  <file_name>"
+        echo
+        echo "  example : gdrive_dl  1LmY-hgYBPbhLk0aovxd2c33IHF1KY_nZ  sample.jpeg"
+        echo
+        exit 1
+    else
+        echo $log_i"arg check"
+    fi
+}
+
+assign_variables(){
+    temp_path="/tmp/"
+    cookie_name=$file_name"_cookie.txt"
+    warning_page=$file_name"_google_drive_virus_scan_warning_page.html"
+    confirm_key=$file_name"_confirm_key.txt"
+    base_url="https://docs.google.com/uc?export=download&id="
+}
+
+wget_check()
+{
+    wget --help > /dev/null 
+    if [ $? -eq 0 ]; then
+        echo $log_s"wget check"
+    else
+        echo $log_e"wget not installed"
+        exit 1
+    fi
+}
+
+print_file_info(){
+    echo $log_n"FILE    : "$file_name
+    echo $log_n"FILE ID : "$file_id
+}
+
+
+download_warning_page(){
+    echo $log_n"downloading google drive virus scan page"
+    wget -q --show-progress --progress=dot --save-cookies $temp_path$cookie_name $base_url$file_id -O- > $temp_path$warning_page
+    echo
+    echo 
+}
+
+extract_confirm_key(){
+    echo $log_n"extracting google drive confirm key"
+    cat $temp_path$warning_page | sed -rn 's/.*confirm=([0-9A-Za-z_]+).*/\1/p' > $temp_path$confirm_key
+    confirm_key_str=`cat $temp_path$confirm_key`
+}
+
+download_file(){
+    if [[ -z $confirm_key_str ]]; then
+        echo $log_n"key is empty - google didn't show warning page ( good! )"
+        echo $log_n"downloading file ( "$file_name" )"
+        wget -q --show-progress --progress=dot -O $file_name $base_url$file_id 
+        echo 
+        echo 
+    else
+        echo $log_n"key present - google showed warning page"
+        echo $log_n"confirm_key : "$confirm_key_str
+        echo $log_n"downloading file ( "$file_name" )"
+        wget -q --show-progress --progress=dot --load-cookies $temp_path$cookie_name -O $file_name $base_url$file_id'&confirm='$confirm_key_str
+        echo 
+        echo 
+    fi
+}
+
+verify_download(){
+    if [[ -f $file_name ]]; then
+        echo $log_s"file downloaded"
+    else
+        echo $log_e"unable to download file"
+    fi
+}
+
+cleanup(){
+    echo $log_s"cleanup temp files"
+    rm -rf $temp_path$confirm_key
+    rm -rf $temp_path$warning_page
+    rm -rf $temp_path$cookie_name
+}
+
+argument_check
+assign_variables
+wget_check
+print_file_info
+download_warning_page
+extract_confirm_key
+download_file
+verify_download
+cleanup
